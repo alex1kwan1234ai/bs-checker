@@ -88,24 +88,29 @@ if st.session_state.active_docs and st.session_state.current_loaded_mode == task
         with st.chat_message(msg["role"]):
             st.write(msg["content"])
 
-    # 7. 對話輸入框
+    # 7. 對話輸入框 (🔧 這裡修正了嚴格的縮排，確保打字後才會觸發 AI 檢索)
     if user_query := st.chat_input("想對照邊份 Spec 嘅要求？"):
+        # 顯示用戶剛才輸入的問題
         with st.chat_message("user"):
             st.write(user_query)
         st.session_state.messages.append({"role": "user", "content": user_query})
 
+        # 這裡的程式碼全部都要乖乖縮排在 `if user_query` 裡面！
         with st.chat_message("assistant"):
             with st.spinner("大腦正在跨文件檢索中..."):
-                system_instruction = "你是一位熟讀香港工程標準與合約規範的註冊屋宇裝備工程師。請用專業地道的香港地盤廣東話回答。"
+                system_instruction = "你是一位熟讀香港工程標準與合約規範的註冊屋宇裝備工程師。請用專業地道的香港地盤廣東話回答。必須在回答結尾註明答案出自文件的哪一個章節或大約頁碼。"
                 
-                # 免費版核心：打包上傳的文件 + 用戶提問
-                response_stream = client.models.generate_content_stream(
-                    model='gemini-3.8-flash',
-                    contents=st.session_state.active_docs + [user_query],
-                    config=types.GenerateContentConfig(system_instruction=system_instruction),
-                )
-                answer = st.write_stream(chunk.text for chunk in response_stream)
-                
-        st.session_state.messages.append({"role": "assistant", "content": answer})
+                try:
+                    # 打包上傳的文件 + 用戶提問
+                    response_stream = client.models.generate_content_stream(
+                        model='gemini-3.8-flash',
+                        contents=st.session_state.active_docs + [user_query],
+                        config=types.GenerateContentConfig(system_instruction=system_instruction),
+                    )
+                    answer = st.write_stream(chunk.text for chunk in response_stream)
+                    st.session_state.messages.append({"role": "assistant", "content": answer})
+                except Exception as e:
+                    st.error(f"💥 Google API 連線異常，請再試一次：{str(e)}")
+                    
 elif load_clicked == False and st.session_state.current_loaded_mode != task_mode:
     st.info("💡 請在上方選好你想查閱的範疇，然後點擊「開始加載通道」按鈕啟動大腦。")
